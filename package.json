@@ -5,14 +5,14 @@
   "description": "Gera a arte 1080x1080 de posts de notícia do newsfirjan a partir de Editoria, Título e foto.",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": "22.x"
   },
   "scripts": {
     "test": "node test/render-local.js"
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",
-    "satori": "^0.33.5",
+    "satori": "0.30.0",
     "sharp": "^0.35.4"
   }
 }
