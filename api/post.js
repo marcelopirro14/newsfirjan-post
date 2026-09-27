@@ -1,10 +1,9 @@
 // Endpoint da Vercel: GET /api/post?editoria=...&titulo=...&foto=...
 // Devolve a arte 1080x1080 (JPEG por padrão). A própria URL serve como "link da imagem"
-// para o módulo do Instagram no Make.
-import { renderPost } from '../lib/render.js';
+// para os módulos do Make (Telegram, Instagram, Facebook).
 
-function erro(status, mensagem) {
-  return new Response(JSON.stringify({ erro: mensagem }), {
+function json(status, obj) {
+  return new Response(JSON.stringify(obj), {
     status,
     headers: { 'Content-Type': 'application/json; charset=utf-8' },
   });
@@ -30,17 +29,28 @@ async function lerParametros(request) {
   };
 }
 
+// O gerador é carregado sob demanda: se alguma dependência falhar ao carregar,
+// a resposta mostra o motivo em vez de derrubar a função.
+let renderPost;
+async function carregarGerador() {
+  if (!renderPost) ({ renderPost } = await import('../lib/render.js'));
+  return renderPost;
+}
+
 async function handler(request) {
   const p = await lerParametros(request);
 
   // Proteção opcional: se a variável CHAVE_ACESSO existir na Vercel, exige ?chave=...
   const chaveEsperada = process.env.CHAVE_ACESSO;
-  if (chaveEsperada && p.chave !== chaveEsperada) return erro(401, 'Chave de acesso inválida.');
+  if (chaveEsperada && p.chave !== chaveEsperada) return json(401, { erro: 'Chave de acesso inválida.' });
 
-  if (!p.titulo || !String(p.titulo).trim()) return erro(400, 'Informe o parâmetro "titulo".');
+  if (!p.titulo || !String(p.titulo).trim()) {
+    return json(400, { erro: 'Informe o parâmetro "titulo".', exemplo: '/api/post?editoria=Política&titulo=Minha manchete' });
+  }
 
   try {
-    const { buffer, contentType } = await renderPost(p);
+    const gerar = await carregarGerador();
+    const { buffer, contentType } = await gerar(p);
     return new Response(buffer, {
       status: 200,
       headers: {
@@ -52,9 +62,18 @@ async function handler(request) {
     });
   } catch (e) {
     console.error('[newsfirjan-post]', e);
-    return erro(500, `Falha ao gerar a imagem: ${e.message}`);
+    return json(500, {
+      erro: `Falha ao gerar a imagem: ${e.message}`,
+      detalhe: String(e.stack || '').split('\n').slice(0, 4).join(' | '),
+      node: process.version,
+    });
   }
 }
 
-export const GET = handler;
-export const POST = handler;
+export async function GET(request) {
+  return handler(request);
+}
+
+export async function POST(request) {
+  return handler(request);
+}
